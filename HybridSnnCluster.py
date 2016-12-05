@@ -2,6 +2,9 @@ import numpy
 from scipy.cluster import hierarchy
 import FuzzyCMeans
 import itertools
+from subprocess import call
+from shutil import rmtree
+import os
 
 class HybridSnnCluster(object):
 
@@ -24,18 +27,27 @@ class HybridSnnCluster(object):
         self.cluster_history = None # (m x number of runs) matrix containing cluster assignment for each sample over every run
 
     def __snn_cliq(self):
-        linkage = hierarchy.linkage(self.__data, method = 'ward')
-        snn_clusters = hierarchy.cut_tree(linkage, 7)[:,0]
-        self.__initialize_cluster_history(snn_clusters)
-        self.__update_relationships()
-
-    def __initialize_cluster_history(self, snn_clusters):
-        self.K = len(set(snn_clusters))
+        #linkage = hierarchy.linkage(self.__data, method = 'ward')
+        #snn_clusters = hierarchy.cut_tree(linkage, 7)[:,0]
+        if not os.path.exists("tmp"):
+            os.path.makedirs("tmp")
+        tmp_data = "tmp/input_data.csv"
+        numpy.savetxt(tmp_data, self.__data, fmt = '%1.7f', delimiter = ',')
+        call(["python SNN.py",  "-e tmp/input_data.csv -i tmp/edge.txt"], shell = True)
+        call(["python Cliq.py", "-i tmp/edge.txt -o tmp/clusters.txt"], shell = True)
+        self.clusters = numpy.loadtxt("tmp/clusters.txt", dtype = int)
+        self.K = len(set(self.clusters))
         self.__current_clusters = self.K
-        self.cluster_history = numpy.zeros((self.__m, self.K - self.__c + 1))
-        self.cluster_history[:, 0] = snn_clusters
-        self.clusters = numpy.array(snn_clusters)
+        self.__reassign_clusters()
         self.__calculate_centroids()
+        self.__initialize_cluster_history()
+
+        if os.path(exists("tmp")):
+            rmtree('/tmp')
+
+    def __initialize_cluster_history(self):
+        self.cluster_history = numpy.zeros((self.__m, self.K - self.__c + 1))
+        self.cluster_history[:, 0] = self.clusters
 
     def __update_relationships(self):
         for i in range(self.__current_clusters):
@@ -53,7 +65,7 @@ class HybridSnnCluster(object):
             members = self.cluster_membership(i)
             cluster_subset = self.__data[members, :]
             self.__set_centroid(i ,numpy.mean(cluster_subset, axis = 0))
-            
+
     def __set_centroid(self, cluster, centroid):
         if len(centroid) != self.__n:
             raise ValueError("Centroid dimensions do not match feature dimensions.")
@@ -71,6 +83,12 @@ class HybridSnnCluster(object):
         cluster1, cluster2 = numpy.where(distance_matrix == distance_matrix.min())[0]
         return cluster1, cluster2
 
+    def __reassign_clusters(self):
+        unique_clusters = list(set(self.clusters))
+        reassign_dict = {unique_clusters[i]:i for i in range(self.__current_clusters)}
+        self.clusters = numpy.array([reassign_dict[each] for each in self.clusters])
+
+
     def __merge_closest_clusters(self):
         # find closest clusters by l2 norm from centroids
         cluster1, cluster2 = self.__closest_centroids()
@@ -78,16 +96,14 @@ class HybridSnnCluster(object):
         cluster1_members = set(self.cluster_membership(cluster1))
         cluster2_members = set(self.cluster_membership(cluster2))
         cluster_union = list(cluster1_members.union(cluster2_members))
-        # re-assign samples to the same cluster      
+        # re-assign samples to the same cluster
         new_cluster = min(cluster1, cluster2)
         self.clusters[cluster_union] = new_cluster
         # decrement the current number of clusters
         self.__current_clusters -= 1
         # re-assign cluster names to prevent number skips
-        unique_clusters = list(set(self.clusters))
-        reassign_dict = {unique_clusters[i]:i for i in range(self.__current_clusters)}
-        self.clusters = numpy.array([reassign_dict[each] for each in self.clusters])  
-        # reset centroids to remove extra dictionary entry       
+        self.__reassign_clusters()
+        # reset centroids to remove extra dictionary entry
         self.__reset_centroids()
         # re-calculate new centroids
         self.__calculate_centroids()
