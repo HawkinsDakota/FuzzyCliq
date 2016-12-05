@@ -2,7 +2,7 @@ import numpy
 from scipy.cluster import hierarchy
 import FuzzyCMeans
 import itertools
-from subprocess import call
+import subprocess
 from shutil import rmtree
 import os
 
@@ -30,11 +30,10 @@ class HybridSnnCluster(object):
         #linkage = hierarchy.linkage(self.__data, method = 'ward')
         #snn_clusters = hierarchy.cut_tree(linkage, 7)[:,0]
         if not os.path.exists("tmp"):
-            os.path.makedirs("tmp")
+            os.makedirs("tmp")
         tmp_data = "tmp/input_data.csv"
         numpy.savetxt(tmp_data, self.__data, fmt = '%1.7f', delimiter = ',')
-        call(["python SNN.py",  "-e tmp/input_data.csv -i tmp/edge.txt"], shell = True)
-        call(["python Cliq.py", "-i tmp/edge.txt -o tmp/clusters.txt"], shell = True)
+        subprocess.run('./snncliq.sh', shell = True)
         self.clusters = numpy.loadtxt("tmp/clusters.txt", dtype = int)
         self.K = len(set(self.clusters))
         self.__current_clusters = self.K
@@ -42,8 +41,7 @@ class HybridSnnCluster(object):
         self.__calculate_centroids()
         self.__initialize_cluster_history()
 
-        if os.path(exists("tmp")):
-            rmtree('/tmp')
+        rmtree('/tmp')
 
     def __initialize_cluster_history(self):
         self.cluster_history = numpy.zeros((self.__m, self.K - self.__c + 1))
