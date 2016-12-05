@@ -87,17 +87,17 @@ def uniq(clique_list=None, edgeFile=None, outfile=None):
 		cliqNum+=1
 
 #------------------- unique assign----------------------------------------
-	for c in cell_cliq.keys(): # for each node
+	for c in list(cell_cliq.keys()): # for each node
 		if len(cell_cliq[c])>1:  # if it is in more than one clique
 			# count links in each clique associated with the cell
 			count_link=defaultdict(list) # key: cliq, value: weighted link in the cliq to the node
-			for connect_node in A[c].keys(): # each neighbor of node c
+			for connect_node in list(A[c].keys()): # each neighbor of node c
 				for cl in cell_cliq[connect_node]: # for each clique that node c in
 					if cl in cell_cliq[c]:
 						count_link[cl].append(A[c][connect_node])
 			# calculate the average of link weights connect from the cliq to the node c
 			max_link={}
-			for cl in count_link.keys():
+			for cl in list(count_link.keys()):
 				max_link[cl]=sum(list(map(float,count_link[cl])))/len(count_link[cl])
 			# select the clique to assign the node c
 			assign_cliq=max(max_link, key=max_link.get)
