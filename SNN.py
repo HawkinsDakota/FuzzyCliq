@@ -16,17 +16,6 @@ def usage():
     print(state)
 
 #KNN list creation made with reference to machinelearningmastery.com
-def FileRead(input_matrix):
-    with open(input_matrix, 'rt') as csvfile:
-        samples=csv.reader(csvfile,delimiter=",")
-        dataset=list(samples)
-        lends=len(dataset)
-        lendr=len(dataset[0])
-        data=[[None for x in range(lendr)]for y in range(lends)]
-        for i in range(1,lends):
-            for j in range(1,lendr):
-                data[i][j]=float(dataset[i][j])
-    return data
 
 def eucDist(vec1,vec2,length):
     distance=0
@@ -117,7 +106,7 @@ def main(argv):
         usage()
         sys.exit(0)
 
-    data=FileRead(input_matrix)#get table
+    data=numpy.loadtxt(input_matrix,delimiter=',')#get table
     simMat=distMatrix(data) #similarity matrix
     KList=KNNFind(simMat,k) #Neighbor list
     Edges=EdgeList(KList,k)#edge list creation
