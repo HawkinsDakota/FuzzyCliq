@@ -29,12 +29,8 @@ def FileRead(input_matrix):
             sampname.append(a)
             for j in range(1,lendr):
                 data[i-1][j-1]=float(dataset[i][j])
-        print(type(data[lends-2][0]))
-        print(len(data))
-        print(len(data[0]))
-        print(type(data[0][0]))
     return data
-    
+
 def eucDist(vec1,vec2,length):
     distance=0
     for x in range(length):
@@ -44,12 +40,12 @@ def eucDist(vec1,vec2,length):
 def distMatrix(dataset):
     lends=len(dataset)
     lendr=len(dataset[0])
-    dMat=[[0 for x in range(lends)] for y in range(lends)]    
+    dMat=[[0 for x in range(lends)] for y in range(lends)]
     for j in range(lends):
         for l in range(lends):
             dMat[j][l]=eucDist(dataset[j],dataset[l],lendr)
     return dMat
-    
+
 def KNNFind(dMat,k):
     lends=len(dMat)
     KList=[[0 for x in range(k)] for y in range(lends)]
@@ -61,7 +57,7 @@ def KNNFind(dMat,k):
 
 def sharedK(v1,v2):
     return list(set(v1).intersection(v2))
-    
+
 def matches(vec,ref):
     match=[]
     for i, x in enumerate(ref):
@@ -69,7 +65,7 @@ def matches(vec,ref):
             if (x==y):
                 match.append(float(i+1))
     return match
-    
+
 def EdgeList(KList,k):
     lenkl=len(KList)
     edge=[[0,0,0]]
@@ -86,16 +82,16 @@ def EdgeList(KList,k):
                     s[ii]=float(k)-.5*(kmi[ii]+kmj[ii])
                 strength=max(s)
                 if (strength>0):
-                    row=[[(i+1),(j+1),strength]]
+                    row=[[int(i+1),int(j+1),strength]]
                     edge=numpy.concatenate((edge,row),axis=0)
-    return edge    
+    return edge
 
 def main(argv):
     print("SNN Starting")
     input_matrix=None
     edgeFile=None
     k=3
-    
+
     try:
         opts, args=getopt.getopt(argv, "e:i:k:h", ["input=","output=","merging=","r-quasi-cliq=","number=","help"])
     except getopt.GetoptError as err:
@@ -123,13 +119,13 @@ def main(argv):
         sys.stderr.write("Error: k must be positive integer.\n")
         usage()
         sys.exit(0)
-    
+
     data=FileRead(input_matrix)#get table
     simMat=distMatrix(data) #similarity matrix
     KList=KNNFind(simMat,k) #Neighbor list
     Edges=EdgeList(KList,k)#edge list creation
-    numpy.savetxt(edgeFile,Edges)
-    
-    
+    numpy.savetxt(edgeFile,Edges, fmt = ['%d', '%d' ,'%1.3f'])
+
+
 if __name__=="__main__":
     main(sys.argv[1:])
