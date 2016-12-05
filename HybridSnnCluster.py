@@ -112,27 +112,55 @@ class HybridSnnCluster(object):
         clustered_members = list(numpy.where(self.clusters == cluster)[0])
         return clustered_members
 
+    def __run_c_means(self, C):
+        c_means = FuzzyCMeans.FuzzyCMeans(self.__data, C, self.__fuzzifier,
+          self.__iterations, self.__epsilon)
+        for key in self.centroids:
+            c_means.set_centroid(key, self.centroids[key])
+        c_means.fit_model(initialize = False)
+        self.clusters = numpy.array(c_means.clusters)
+        self.centroids = c_means.centroids
+
     def fit_model(self):
         print("Running SNNCliq to initialize clustering...")
         self.__snn_cliq()
+        self.__run_c_means(self.K)
+        self.cluster_history[:,0] = self.clusters
         current_run = 1
         for i in range(self.K - 1, self.__c - 1, -1):
             print("Running Fuzzy C-means with c = {0}...".format(i))
             self.__merge_closest_clusters()
-            fuzzy_clusters = FuzzyCMeans.FuzzyCMeans(self.__data, i, self.__fuzzifier,
-              self.__iterations, self.__epsilon)
-            for key in self.centroids:
-                fuzzy_clusters.set_centroid(key, self.centroids[key])
-            fuzzy_clusters.fit_model(initialize = False)
-            self.clusters = numpy.array(fuzzy_clusters.clusters)
-            self.centroids = fuzzy_clusters.centroids
+            self.__run_c_means(i)
             self.__update_relationships()
-            print(self.__current_clusters)
-            print(self.cluster_history.shape)
-            print(current_run)
             self.cluster_history[:,current_run] = self.clusters
             current_run += 1
+
+    def calculate_metrics(self):
+        probability_of_match = self.match_matrix / (self.K - self.__c + 1)
+        cluster_probabilities = numpy.zeros((self.K, self.cluster_history.shape[1]))
+        for run in range(self.cluster_history.shape[1]):
+            current_grouping = self.cluster_history[:, run]
+            cluster_averages = numpy.zeros(len(set(current_grouping)))
+            i = 0
+            for cluster in set(current_grouping):
+                grouped = numpy.where(current_grouping == cluster)[0]
+                average_probs = [numpy.mean(probability_of_match[each, grouped]) for each in grouped]
+                cluster_averages[i] = numpy.mean(average_probs)
+                i += 1
+            #scaled_averages = cluster_averages / sum(cluster_averages)
+            scaled_averages = cluster_averages #/ numpy.sum(numpy.triu(probability_of_match))
+            cluster_probabilities[0:len(scaled_averages), run] = scaled_averages
+        return(cluster_probabilities)
+
+test_data = numpy.ones((150, 5))
+test_data[0:50,:] *= numpy.random.normal(0,1, (50,5))
+test_data[50:100,:] *= numpy.random.normal(4,1, (50,5))
+test_data[100:150,:] *= numpy.random.normal(-2,1, (50,5))
+c = HybridSnnCluster(test_data)
+c.fit_model()
+c.calculate_metrics()
+
 from pandas import read_csv
-data = read_csv("~/GradSchool/2016-2017/Bradham/challenge2016/Data/quantileNormalized.txt", sep = "\t").T
+data = read_csv("/home/dakota/Documents/School/2016-2017/challenge2016/Data/quantileNormalized.txt", sep = "\t").T
 b = HybridSnnCluster(data)
 b.fit_model()
