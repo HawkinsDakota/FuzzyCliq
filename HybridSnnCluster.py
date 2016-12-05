@@ -1,14 +1,15 @@
 import numpy
-from scipy.cluster import hierarchy
+
 import FuzzyCMeans
 import itertools
 import subprocess
-from shutil import rmtree
+from pandas import DataFrame
+from sklearn import decomposition
 import os
 
 class HybridSnnCluster(object):
 
-    def __init__(self, data, c = 2, fuzzifier = 2, iterations = 300, epsilon = 10**-3):
+    def __init__(self, data, c = 2, fuzzifier = 2, iterations = 100, epsilon = 10**-3):
         if c < 2:
             raise ValueError("Lower bound of clusters must be higher than 2.")
         self.__c = c # user inputed lower bound for number of clusters
@@ -25,6 +26,7 @@ class HybridSnnCluster(object):
         self.clusters = None # cluster assignment for each sample
         self.centroids = {} # dictionary containing centroids for each cluster
         self.cluster_history = None # (m x number of runs) matrix containing cluster assignment for each sample over every run
+        self.centroid_history = {} # dictionary of dictionaries for centroids at each iteration.
 
     def __snn_cliq(self):
         #linkage = hierarchy.linkage(self.__data, method = 'ward')
@@ -33,15 +35,22 @@ class HybridSnnCluster(object):
             os.makedirs("tmp")
         tmp_data = "tmp/input_data.csv"
         numpy.savetxt(tmp_data, self.__data, fmt = '%1.7f', delimiter = ',')
-        subprocess.run('./snncliq.sh', shell = True)
+        subprocess.call('./snncliq.sh')
+
+        if not os.path.exists("tmp/clusters.txt"):
+           raise IOError("Cluster file was not written.")
         self.clusters = numpy.loadtxt("tmp/clusters.txt", dtype = int)
+        if len(self.clusters) != self.__m:
+            raise ValueError("SNNCliq failed to return the appropriate number of cluster assignments. Consider re-running.")
+
         self.K = len(set(self.clusters))
         self.__current_clusters = self.K
         self.__reassign_clusters()
         self.__calculate_centroids()
         self.__initialize_cluster_history()
-
-        rmtree('/tmp')
+        os.remove("tmp/input_data.csv")
+        os.remove("tmp/clusters.txt")
+        os.remove("tmp/edge.txt")
 
     def __initialize_cluster_history(self):
         self.cluster_history = numpy.zeros((self.__m, self.K - self.__c + 1))
@@ -123,7 +132,8 @@ class HybridSnnCluster(object):
         print("Running SNNCliq to initialize clustering...")
         self.__snn_cliq()
         self.__run_c_means(self.K)
-        self.cluster_history[:,0] = self.clusters
+        self.__initialize_cluster_history()
+        self.centroid_history[0] = self.centroids
         current_run = 1
         for i in range(self.K - 1, self.__c - 1, -1):
             print("Running Fuzzy C-means with c = {0}...".format(i))
@@ -131,6 +141,7 @@ class HybridSnnCluster(object):
             self.__run_c_means(i)
             self.__update_relationships()
             self.cluster_history[:,current_run] = self.clusters
+            self.centroid_history[current_run] = self.centroids
             current_run += 1
 
     def calculate_metrics(self):
@@ -150,15 +161,80 @@ class HybridSnnCluster(object):
             cluster_probabilities[0:len(scaled_averages), run] = scaled_averages
         return(cluster_probabilities)
 
-test_data = numpy.ones((150, 5))
-test_data[0:50,:] *= numpy.random.normal(0,1, (50,5))
-test_data[50:100,:] *= numpy.random.normal(4,1, (50,5))
-test_data[100:150,:] *= numpy.random.normal(-2,1, (50,5))
-c = HybridSnnCluster(test_data)
-c.fit_model()
-c.calculate_metrics()
+    def write_cluster_history(self, output_file, sep = ','):
+        columns = ["Iter{0}".format(i + 1) for i in range(self.cluster_history.shape[1])]
+        rows = ["Sample{0}".format(i + 1) for i in range(self.__m)]
+        output = DataFrame(self.cluster_history, index = rows, columns = columns)
+        output.to_csv(output_file, sep = sep)
 
-from pandas import read_csv
-data = read_csv("/home/dakota/Documents/School/2016-2017/challenge2016/Data/quantileNormalized.txt", sep = "\t").T
-b = HybridSnnCluster(data)
-b.fit_model()
+    def members_at_iter(self, cluster, iter_step):
+        return(numpy.where(self.cluster_history[:, iter_step] == cluster)[0])
+
+    def get_centroid_history_pca_data(self):
+        feature_space = decomposition.PCA()
+        feature_space.fit(self.__data)
+        combined_data = []
+        for runs in self.centroid_history:
+            current = self.centroid_history[runs]
+            for centroid in current:
+                centroid_pca = feature_space.transform(current[centroid].reshape(1,-1))
+                current_row = numpy.hstack((numpy.array(runs).reshape((1,-1)),
+                                            numpy.array(centroid).reshape((1,-1)),
+                                            centroid_pca))
+                samples = self.members_at_iter(centroid, runs)
+                repeat_row = numpy.tile(current_row, len(samples)).reshape(len(samples), current_row.shape[1])
+                if centroid == 0 and runs == 0:
+                    combined_data = numpy.hstack((samples.reshape((len(samples), 1)), repeat_row))
+                else:
+                    new_rows =  numpy.hstack((samples.reshape((len(samples), 1)), repeat_row))
+                    combined_data = numpy.vstack((combined_data, new_rows))
+
+        first_columns = ['Sample', 'Iteration', 'Cluster']
+        components = ["PC{0}".format(i+1) for i in range(combined_data.shape[1] - 3)]
+        plot_data = DataFrame(combined_data,
+                              columns = first_columns + components)
+        for each in first_columns:
+            plot_data[each] = plot_data[each].astype('int')
+        return(plot_data)
+    
+    def centroid_history_as_dataframe(self):
+        if len(self.centroid_history) == 0:
+            raise ValueError("Centroid history not instanstiated. Must call 'fit_model()' first.")
+        combined_data = []
+        for runs in self.centroid_history:
+            current = self.centroid_history[runs]
+            for centroid in current:
+                centroid_pca = current[centroid].reshape(1,-1)
+                current_row = numpy.hstack((numpy.array(runs).reshape((1,-1)),
+                                            numpy.array(centroid).reshape((1,-1)),
+                                            centroid_pca))
+                if centroid == 0 and runs == 0:
+                    combined_data = current_row
+                else:
+                    combined_data = numpy.vstack((combined_data, current_row))
+
+        first_columns = ['Iteration', 'Cluster']
+        components = ["Feature{0}".format(i+1) for i in range(combined_data.shape[1] - 2)]
+        centroid_df = DataFrame(combined_data,
+                              columns = first_columns + components)
+        for each in first_columns:
+            centroid_df[each] = centroid_df[each].astype('int')
+        return(centroid_df)
+
+
+
+#test_data = numpy.ones((150, 5))
+#test_data[0:25,:] *= numpy.random.normal(0,1, (25,5))
+#test_data[25:50,:] *= numpy.random.normal(-4,1, (25,5))
+#test_data[50:75,:] *= numpy.random.normal(2,1, (25,5))
+#test_data[75:100,:] *= numpy.random.normal(4,1, (25,5))
+#test_data[100:125,:] *= numpy.random.normal(1,1, (25,5))
+#test_data[125:150,:] *= numpy.random.normal(-2,1, (25,5))
+#c = HybridSnnCluster(test_data)
+#c.fit_model()
+#huh = c.centroid_history_as_dataframe()
+
+#from pandas import read_csv
+#data = read_csv("/home/dakota/Documents/School/2016-2017/challenge2016/Data/quantileNormalized.txt", sep = "\t").T
+#b = HybridSnnCluster(data)
+#b.fit_model()
