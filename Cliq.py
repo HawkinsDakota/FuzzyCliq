@@ -5,23 +5,24 @@
 ############################################################
 # developed in Python 2.7.3 (tested on Python 3.5.0)       #
 # by Chen Xu  cxu3@uncc.edu                                #
-# Department of Bioinformatics and Genomics, UNC-Charlotte #       
+# Department of Bioinformatics and Genomics, UNC-Charlotte #
 # Aug 2014                                                 #
 ############################################################
 
 import re, os, sys, getopt
 from collections import defaultdict
 import itertools
+from numpy import savetxt
 
-### step4. format output 
+### step4. format output
 ### infile: one line for one clique
 ### outfile: cluster ID in a column; line Number is the cell index
 def output(clique_list=None, outfile=None, number_cells=None):
-	if (clique_list is None) or (outfile is None) or (number_cells is None): 
+	if (clique_list is None) or (outfile is None) or (number_cells is None):
 		sys.stderr.write("wrong argument number from output()")
 		sys.exit(1)
 	cell_clqID={}
-
+	out_list = []
 	clqID=1
 	for line in clique_list:
 		cells=line.split(' ')
@@ -38,22 +39,25 @@ def output(clique_list=None, outfile=None, number_cells=None):
 		for c in range(1,number_cells+1):
 			if c in cell_clqID:
 				outfn.write(cell_clqID[c]+'\n')
+				out_list.append(int(cell_clqID[c]))
 			else:   # some cells have not been covered because no clique found for them.
 				outfn.write('-1\n')
+				out_list.append(-1)
 		outfn.close()
 	except IOError:
 		sys.stderr.write("cannot open outfile\n")
 		sys.exit(1)
+	savetxt(outfile, out_list, fmt = ['%1d'])
 # end 4
 
 
 ### 3. delete overlap. After merging, if one cell appears in multiple cliques (and the cliques do not satisfy merging), select one cliq for the cell to be in. At the same time, delete the cell from the other cliques.
 ### criteria: select the cliq who has bigger average link weights to the node (by checking the SNN graph)
 def uniq(clique_list=None, edgeFile=None, outfile=None):
-	# clique_list: clique output from merge() 
+	# clique_list: clique output from merge()
 	# edgeFile: pair of nodes and weigh of edge (3 column file)
 	# outfile: clique output file, each line is a clique
-	if (clique_list is None) or (edgeFile is None): 
+	if (clique_list is None) or (edgeFile is None):
 		sys.stderr.write("wrong argument number from uniq()")
 		sys.exit(1)
 
@@ -82,7 +86,7 @@ def uniq(clique_list=None, edgeFile=None, outfile=None):
 			cliq_cell[str(cliqNum)].append(c)
 		cliqNum+=1
 
-#------------------- unique assign---------------------------------------- 
+#------------------- unique assign----------------------------------------
 	for c in cell_cliq.keys(): # for each node
 		if len(cell_cliq[c])>1:  # if it is in more than one clique
 			# count links in each clique associated with the cell
@@ -91,14 +95,14 @@ def uniq(clique_list=None, edgeFile=None, outfile=None):
 				for cl in cell_cliq[connect_node]: # for each clique that node c in
 					if cl in cell_cliq[c]:
 						count_link[cl].append(A[c][connect_node])
-			# calculate the average of link weights connect from the cliq to the node c		
+			# calculate the average of link weights connect from the cliq to the node c
 			max_link={}
 			for cl in count_link.keys():
 				max_link[cl]=sum(list(map(float,count_link[cl])))/len(count_link[cl])
 			# select the clique to assign the node c
-			assign_cliq=max(max_link, key=max_link.get)		
-			#print c+" in "+" ".join(cell_cliq[c])+" assign: "+assign_cliq	
-			
+			assign_cliq=max(max_link, key=max_link.get)
+			#print c+" in "+" ".join(cell_cliq[c])+" assign: "+assign_cliq
+
 			# assign to one and delete in other cliqs
 			for cl in cell_cliq[c]:
 				if not cl==assign_cliq:
@@ -108,7 +112,7 @@ def uniq(clique_list=None, edgeFile=None, outfile=None):
 	uniqCliq_list=[]
 	for cl in sorted(list(map(int,cliq_cell.keys()))):
 		if len(cliq_cell[str(cl)])>0:
-			uniqCliq_list.append(" ".join(cliq_cell[str(cl)])+'\n')	
+			uniqCliq_list.append(" ".join(cliq_cell[str(cl)])+'\n')
 
 	if outfile:
 		try:
@@ -116,9 +120,9 @@ def uniq(clique_list=None, edgeFile=None, outfile=None):
 			outfn.write("\n".join(uniqCliq_list))
 			outfn.close()
 		except IOError:
-			sys.stderr.write("cannot open "+outfile+"\n")	
+			sys.stderr.write("cannot open "+outfile+"\n")
 			sys.exit(1)
-	
+
 	return uniqCliq_list
 
 ## end 3.
@@ -133,7 +137,7 @@ def merge(clique_list=None, cutoff=None):
 	if (clique_list is None):
 		sys.stderr.write("wrong argument number from merge()")
 		sys.exit(1)
-	if cutoff is None:	cutoff=0.5 # 
+	if cutoff is None:	cutoff=0.5 #
 	cell_cliq=defaultdict(list) # key: cell ID, value: a list of cliq ID(str) that the cell belongs to
 	cliq_cell=defaultdict(list) # key: cliq ID(str), value: a list of cells ID in the cliq
 	cliqNum=1
@@ -145,7 +149,7 @@ def merge(clique_list=None, cutoff=None):
 			cliq_cell[str(cliqNum)].append(c)
 		cliqNum+=1
 
-		
+
 #------------- inner merge cycle---------------------------
 	merged_bl=mergeOnline(cutoff, cell_cliq, cliq_cell)
 	while merged_bl:
@@ -162,7 +166,7 @@ def merge(clique_list=None, cutoff=None):
 		mergedCliq_list.append(" ".join(cliq_cell[cl]))
 	return mergedCliq_list
 
-# 2a. on-line merging algorithm. refresh the cliques and re-do the candidate searching after each merge happens. 
+# 2a. on-line merging algorithm. refresh the cliques and re-do the candidate searching after each merge happens.
 # sort the candidate of merging by the size of cliques, this will allow bigger clique join small cliques first, instead of small cliques join first.
 def mergeOnline(cutoff=None, cell_cliq=None, cliq_cell=None):
 	# the function will make one possible merge and return
@@ -186,7 +190,7 @@ def mergeOnline(cutoff=None, cell_cliq=None, cliq_cell=None):
 				else:
 					overlapCliq[grp]=1
 
-	
+
 	#select overlapped cliques to merge
 	# Since one cliq can overlap with multiple cliqs, create a score to sort all possible mergings
 	# score is the size of the cliques to merge
@@ -207,27 +211,27 @@ def mergeOnline(cutoff=None, cell_cliq=None, cliq_cell=None):
 				bl=1
 		if bl==1:
 			cliq2Merge[grp]=sum_size
-	
+
 	# online merge: merge only one candidate group, then refresh.
 	# merge the one with the biggest score
 	currCliqNum=max(list(map(int, cliq_cell.keys())))+1
 	if len(cliq2Merge.keys()):
-		grp=max(cliq2Merge, key=cliq2Merge.get)	
-		#print "merge "+grp+": "+str(cliq2Merge[grp])	
+		grp=max(cliq2Merge, key=cliq2Merge.get)
+		#print "merge "+grp+": "+str(cliq2Merge[grp])
 		new={}
 		for cl in grp.split(' '):
 			for c in cliq_cell[cl]:
 				new[int(c)]=''
-				# refresh the cell_cliq for on-line learning 
+				# refresh the cell_cliq for on-line learning
 				index=cell_cliq[c].index(cl)
 				del cell_cliq[c][index]   # delete old cliq index
 				if str(currCliqNum) not in cell_cliq[c]: # add new cliq index
-					cell_cliq[c].append(str(currCliqNum)) 
+					cell_cliq[c].append(str(currCliqNum))
 			del cliq_cell[cl]
 		cliq_cell[str(currCliqNum)]=list(map(str,sorted(new.keys())))
 
 	return len(cliq2Merge.keys())
-		
+
 # end of mergeInner
 ## end 2. merge()
 
@@ -236,10 +240,10 @@ def mergeOnline(cutoff=None, cell_cliq=None, cliq_cell=None):
 # inFile: pair-wise similarity #format: "node_index node_index edge_similarity\n"
 # r: cutoff for quasi-clique
 def findQuasiCliq(infile=None, r=None):
-	if infile is None: 
+	if infile is None:
 		sys.stderr.write("wrong argument number for findQuasiCliq()")
 		sys.exit(1)
-	if r is None:	r=0.7 # 
+	if r is None:	r=0.7 #
 	minCliqueSize=3 # minimum acceptable clique size
 
 	nodehash=defaultdict(list)
@@ -261,13 +265,13 @@ def findQuasiCliq(infile=None, r=None):
 				nodehash[lst[1]].append(lst[0])
 		infn.close()
 	except IOError:
-		sys.stderr.write("Error: cannot open input file "+infile+"\n")	
+		sys.stderr.write("Error: cannot open input file "+infile+"\n")
 		sys.exit(1)
 
 #-----------------find clique for each node -------------------
 	cliques={}
-	
-	for node in sorted(nodehash): 
+
+	for node in sorted(nodehash):
 		neighList=list(nodehash[node]) ### get all neighbors
 		while 1:
 			if len(neighList)<(minCliqueSize-1):
@@ -287,9 +291,9 @@ def findQuasiCliq(infile=None, r=None):
 			else:
 				### does not satisfy, delete the neighbor
 				neighList.remove(minDegNeigh)
-			
-		# quasi-cliq found	
-		if len(neighList)>=(minCliqueSize-1):	
+
+		# quasi-cliq found
+		if len(neighList)>=(minCliqueSize-1):
 			neighList.append(node)
 			neighList.sort(key=int)
 			cliques[" ".join(neighList)]=len(neighList)
@@ -367,7 +371,7 @@ def main(argv):
 			print("Error in arguments: unknown option\n")
 			usage()
 			sys.exit(0)
-			
+
 	if (edgeFile is None) or (outfile is None):
 		sys.stderr.write("Error in arguments: must specify -i -o\n")
 		usage()
@@ -403,4 +407,3 @@ def main(argv):
 
 if __name__=="__main__":
 	main(sys.argv[1:])
-
