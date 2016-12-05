@@ -22,13 +22,10 @@ def FileRead(input_matrix):
         dataset=list(samples)
         lends=len(dataset)
         lendr=len(dataset[0])
-        sampname=[]
-        data=[[None for x in range(lendr-1)]for y in range(lends-1)]
+        data=[[None for x in range(lendr)]for y in range(lends)]
         for i in range(1,lends):
-            a=dataset[i][0]
-            sampname.append(a)
             for j in range(1,lendr):
-                data[i-1][j-1]=float(dataset[i][j])
+                data[i][j]=float(dataset[i][j])
     return data
 
 def eucDist(vec1,vec2,length):
