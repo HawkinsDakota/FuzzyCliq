@@ -50,20 +50,20 @@ testsetgen<-function(samples,noDropFile,testFile,infoFile){
   #for (i in 1:length(new[,1])){
   #  zgene[i]<-length(which(new[i,]==0))
   #} #check if all values are filled
-  new0<-pmax(new) #remove values less than zero
-  write.csv(new0,noDropFile,row.names=TRUE,col.names = TRUE)
+  new[new<0]<-0 #remove values less than zero
+  write.csv(new,noDropFile,row.names=TRUE,col.names = TRUE)
 
 
-  newsum<-sum(colSums(new0))
+  newsum<-sum(colSums(new))
   newmean<-newsum/(dim(new)[1]*dim(new)[2])
   lmb=(-log(.75)/(newmean^2)) #get lambda
 
-  p0<-exp(-lmb*(new0*new0)) #get p0 matrix
+  p0<-exp(-lmb*(new*new)) #get p0 matrix
   check<-data.frame(matrix(runif(dim(new)[1]*dim(new)[2]),dim(new)[1],dim(new)[2]))
   thestrokes<-p0>=check
-  new0[which(thestrokes,arr.ind=TRUE)]<-0
+  new[which(thestrokes,arr.ind=TRUE)]<-0
 
-  write.csv(new0,testFile,row.names=TRUE,col.names = TRUE)
+  write.csv(new,testFile,row.names=TRUE,col.names = TRUE)
 
   info<-'INFO'
   for (i in 1:samples){
