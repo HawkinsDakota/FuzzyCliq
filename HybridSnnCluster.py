@@ -1,5 +1,9 @@
-import numpy
+"""
+@author Dakota Hawkins
+Last edited: December 7, 2016
+"""
 
+import numpy
 import FuzzyCMeans
 import itertools
 import subprocess
@@ -196,7 +200,7 @@ class HybridSnnCluster(object):
         for each in first_columns:
             plot_data[each] = plot_data[each].astype('int')
         return(plot_data)
-    
+
     def centroid_history_as_dataframe(self):
         if len(self.centroid_history) == 0:
             raise ValueError("Centroid history not instanstiated. Must call 'fit_model()' first.")

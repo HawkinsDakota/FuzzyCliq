@@ -1,3 +1,8 @@
+"""
+@author Dakota Hawkins
+Last edited: December 7, 2016
+"""
+
 import numpy
 
 class FuzzyCMeans(object):
