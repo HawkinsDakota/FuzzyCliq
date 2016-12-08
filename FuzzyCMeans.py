@@ -37,7 +37,7 @@ class FuzzyCMeans(object):
     def set_centroid(self, cluster, new_centroid):
         if (len(new_centroid) != len(self.centroids[cluster])):
             raise ValueError("Dimensions of centroids do not align. \n New centroid: {0} \n Old centroid: {1}".format(len(new_centroid), len(self.centroids[cluster])))
-        if any(new_centroid < (self.__minimums - 1)) or any(new_centroid > (self.__maximums + 1)):            
+        if any(new_centroid < (self.__minimums - 1)) or any(new_centroid > (self.__maximums + 1)):
             raise ValueError("New centroid values outside of feature range.")
         self.centroids[cluster] = new_centroid
 
@@ -76,7 +76,6 @@ class FuzzyCMeans(object):
         transform_matrix = numpy.diag(self.__maximums - self.__minimums)
         min_matrix = numpy.mat(numpy.ones((self.__c, self.__n)))*numpy.diag(self.__minimums)
         random_centroids = numpy.mat(random_matrix)*transform_matrix + min_matrix
-        print("This is the shape: {0}".format(random_centroids.shape))
         for i in range(self.__c):
             self.set_centroid(i, numpy.array(random_centroids)[i, :])
 
@@ -111,4 +110,3 @@ class FuzzyCMeans(object):
             centroid_change[i] = numpy.dot(old_centroids[i] - self.centroids[i],
                                            old_centroids[i] - self.centroids[i])
         return(centroid_change)
-    
