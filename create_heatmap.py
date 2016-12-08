@@ -26,16 +26,21 @@ title = ["Simulated Data with 10 Means - No Dropout", "Simulated Data with 10 Me
 
 csv_files = ['TestSet2Sample.csv','10NDSample2.csv', '5Sample2.csv','5NDSample2.csv','set2cluster.csv','TestSet10SampleNoDrop.csv','10Sample2.csv','TestSet10Sample.csv','TestSet5SampleNoDrop.csv','TestSet5Sample.csv','TestSet2SampleNoDrop.csv']
 
-save_files = ['TestSet2Sample_heatmap.png',
-'10NDSample2_heatmap.png',
-'5Sample2_heatmap.png',
-'5NDSample2_heatmap.png',
-'set2cluster_heatmap.png',
-'TestSet10SampleNoDrop_heatmap.png',
-'10Sample2_heatmap.png',
-'TestSet10Sample_heatmap.png',
-'TestSet5SampleNoDrop_heatmap.png', 'TestSet5Sample_heatmap.png',
-'TestSet2SampleNoDrop_heatmap.png']
+save_files = ['data/TestSet2Sample_heatmap.png',
+'data/10NDSample2_heatmap.png',
+'data/5Sample2_heatmap.png',
+'data/5NDSample2_heatmap.png',
+'data/set2cluster_heatmap.png',
+'data/TestSet10SampleNoDrop_heatmap.png',
+'data/10Sample2_heatmap.png',
+'data/TestSet10Sample_heatmap.png',
+'data/TestSet5SampleNoDrop_heatmap.png', 'data/TestSet5Sample_heatmap.png',
+'data/TestSet2SampleNoDrop_heatmap.png']
+
+csv_files = ["data/10Sample2.csv", "data/10NDSample2.csv"]
+title = ["Simulated Data with 10 Means - Dropout", "Simulated Data with 10 Means - No Dropout"]
+save_files = ["plots/10Sample2_heatmap.png", "plots/10NDSample2_heatmap.png"]
+
 
 print(len(csv_files), len(save_files), len(title))
 for i in range(len(csv_files)):
