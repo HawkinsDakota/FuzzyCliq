@@ -1,4 +1,4 @@
-# HawkinHackett
+# FuzzyCliq
 For CompBio
 
 Assuming sample by gene data matrix `data` with `C` assumed sample clusters:
